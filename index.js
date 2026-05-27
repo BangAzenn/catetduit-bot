@@ -10,7 +10,7 @@ app.use(express.json());
 // PENGATURAN UTAMA
 // ==========================================
 // PASTIKAN GANTI DENGAN URL WEBHOOK CODE.GS ANDA!
-const GAS_WEBHOOK_URL = 'MASUKKAN_URL_GOOGLE_APPS_SCRIPT_ANDA_DISINI';
+const GAS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxUjD8FMi8mqbP6GqLi-vsmt7EjhOjXHZuV3Tws_LTmMbVxUcCBOZlVNkzYLiYrmjKzqw/exec';
 const PORT = process.env.PORT || 10000; // Render menggunakan port 10000
 
 console.log('Memulai browser Chrome... Mohon tunggu 1-2 menit hingga QR Code muncul.');
