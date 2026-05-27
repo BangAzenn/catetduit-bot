@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 10000;
 let currentQR = ""; 
 let isConnected = false;
 let botStatus = "MENUNGGU SCAN QR"; // Indikator status
+let loadingPercent = "0%";
 
 // ==========================================
 // 1. NYALAKAN SERVER WEB LEBIH DULU
@@ -23,8 +24,16 @@ app.listen(PORT, '0.0.0.0', () => {
 app.get('/', (req, res) => {
     if (botStatus === "READY") {
         res.send('<h1 style="color:green; text-align:center; margin-top:50px;">✅ Bot Sudah Terhubung ke WhatsApp!</h1><p style="text-align:center;">Sistem siap digunakan untuk mencatat keuangan.</p>');
-    } else if (botStatus === "PROSES LOGIN") {
-        res.send('<h1 style="color:orange; text-align:center; margin-top:50px;">⏳ Sedang Sinkronisasi WhatsApp...</h1><p style="text-align:center; max-width:600px; margin:auto;">Anda sudah berhasil scan QR. Bot sedang memuat data chat (proses ini bisa memakan waktu 2-5 menit karena limit memori server gratis).<br><br><b>Mohon bersabar dan biarkan proses ini berjalan. Refresh halaman ini sesekali.</b></p>');
+    } else if (botStatus === "PROSES LOGIN" || botStatus.includes("LOADING")) {
+        res.send(`<h1 style="color:orange; text-align:center; margin-top:50px;">⏳ Sedang Sinkronisasi WhatsApp... (${loadingPercent})</h1>
+        <p style="text-align:center; max-width:600px; margin:auto; line-height: 1.6;">
+        Anda sudah berhasil tertaut dengan WhatsApp.<br>
+        Saat ini bot sedang mengunduh riwayat pesan Anda.<br><br>
+        <span style="background:#fff3cd; padding:10px; border-radius:5px; display:inline-block; border: 1px solid #ffeeba;">
+        <b>⚠️ PENTING:</b> Proses ini memakan waktu <b>5 hingga 10 menit</b> di server Render gratisan. Mohon jangan ditutup atau disingkirkan dari Perangkat Tertaut.
+        </span><br><br>
+        Refresh (F5) halaman ini untuk melihat update persentase.
+        </p>`);
     } else if (currentQR) {
         let qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentQR)}`;
         res.send(`
@@ -72,6 +81,13 @@ const client = new Client({
     }
 });
 
+// EVENT 0: Membaca progress loading dari WhatsApp
+client.on('loading_screen', (percent, message) => {
+    botStatus = "LOADING";
+    loadingPercent = `${percent}%`;
+    console.log(`⏳ LOADING WA: ${percent}% - ${message}`);
+});
+
 // EVENT 1: Minta QR Code
 client.on('qr', (qr) => {
     currentQR = qr;
@@ -83,7 +99,7 @@ client.on('qr', (qr) => {
 client.on('authenticated', () => {
     currentQR = "";
     botStatus = "PROSES LOGIN";
-    console.log('⏳ BERHASIL SCAN! Sedang melakukan sinkronisasi chat. Mohon tunggu, ini butuh waktu agak lama di server Render...');
+    console.log('⏳ BERHASIL SCAN! Sedang melakukan sinkronisasi chat. Mohon tunggu...');
 });
 
 // EVENT 3: Gagal Scan
@@ -104,7 +120,6 @@ client.on('disconnected', (reason) => {
     isConnected = false;
     botStatus = "TERPUTUS";
     console.log('❌ WA Terputus karena:', reason);
-    // Restart client agar minta scan ulang
     client.initialize(); 
 });
 
