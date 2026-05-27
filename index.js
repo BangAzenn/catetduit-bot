@@ -11,28 +11,32 @@ const PORT = process.env.PORT || 10000;
 
 let currentQR = ""; 
 let isConnected = false;
+let botStatus = "MENUNGGU SCAN QR"; // Indikator status
 
 // ==========================================
-// 1. NYALAKAN SERVER WEB LEBIH DULU (ANTI 502 BAD GATEWAY)
+// 1. NYALAKAN SERVER WEB LEBIH DULU
 // ==========================================
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Server Web API langsung berjalan di port ${PORT}`);
 });
 
 app.get('/', (req, res) => {
-    if (isConnected) {
-        res.send('<h1>✅ Bot Sudah Terhubung ke WhatsApp!</h1><p>Sistem siap digunakan.</p>');
+    if (botStatus === "READY") {
+        res.send('<h1 style="color:green; text-align:center; margin-top:50px;">✅ Bot Sudah Terhubung ke WhatsApp!</h1><p style="text-align:center;">Sistem siap digunakan untuk mencatat keuangan.</p>');
+    } else if (botStatus === "PROSES LOGIN") {
+        res.send('<h1 style="color:orange; text-align:center; margin-top:50px;">⏳ Sedang Sinkronisasi WhatsApp...</h1><p style="text-align:center; max-width:600px; margin:auto;">Anda sudah berhasil scan QR. Bot sedang memuat data chat (proses ini bisa memakan waktu 2-5 menit karena limit memori server gratis).<br><br><b>Mohon bersabar dan biarkan proses ini berjalan. Refresh halaman ini sesekali.</b></p>');
     } else if (currentQR) {
         let qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentQR)}`;
         res.send(`
             <div style="text-align: center; font-family: sans-serif; margin-top: 50px;">
                 <h2>Scan QR Code di Bawah Ini:</h2>
                 <img src="${qrImageUrl}" alt="WhatsApp QR Code" style="border: 2px solid #ccc; border-radius: 10px; padding: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <p style="margin-top:20px; font-size:18px;">Status: <b>${botStatus}</b></p>
                 <p>Refresh halaman ini jika QR code gagal/kadaluarsa.</p>
             </div>
         `);
     } else {
-        res.send('<h2 style="text-align:center; margin-top:50px;">Sedang memuat sistem WhatsApp... Silakan refresh (F5) dalam 1-2 menit.</h2>');
+        res.send(`<h2 style="text-align:center; margin-top:50px;">Sedang memuat sistem WhatsApp... Status: ${botStatus}</h2><p style="text-align:center;">Silakan refresh (F5) dalam 1-2 menit.</p>`);
     }
 });
 
@@ -49,7 +53,7 @@ app.post('/send-message', async (req, res) => {
 });
 
 // ==========================================
-// 2. INISIALISASI WHATSAPP SETELAH SERVER WEB AMAN
+// 2. INISIALISASI WHATSAPP 
 // ==========================================
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -63,22 +67,48 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu',
-            '--single-process' // Optimasi ekstra agar RAM Render tidak penuh
+            '--single-process'
         ]
     }
 });
 
+// EVENT 1: Minta QR Code
 client.on('qr', (qr) => {
     currentQR = qr;
+    botStatus = "MENUNGGU SCAN QR";
     console.log('✅ QR BARU SIAP! Buka URL Render Anda di browser.');
 });
 
-client.on('ready', () => {
-    isConnected = true;
+// EVENT 2: Sukses Scan (Tapi belum selesai loading)
+client.on('authenticated', () => {
     currentQR = "";
-    console.log('✅ Bot WhatsApp CatetDuit Berhasil Terhubung!');
+    botStatus = "PROSES LOGIN";
+    console.log('⏳ BERHASIL SCAN! Sedang melakukan sinkronisasi chat. Mohon tunggu, ini butuh waktu agak lama di server Render...');
 });
 
+// EVENT 3: Gagal Scan
+client.on('auth_failure', msg => {
+    botStatus = "GAGAL LOGIN";
+    console.error('❌ Gagal autentikasi:', msg);
+});
+
+// EVENT 4: Loading Selesai, Bot Siap 100%
+client.on('ready', () => {
+    isConnected = true;
+    botStatus = "READY";
+    console.log('🚀 BOT WA SUDAH READY DAN SIAP MEMBALAS PESAN!');
+});
+
+// EVENT 5: WA Terputus dari HP
+client.on('disconnected', (reason) => {
+    isConnected = false;
+    botStatus = "TERPUTUS";
+    console.log('❌ WA Terputus karena:', reason);
+    // Restart client agar minta scan ulang
+    client.initialize(); 
+});
+
+// MENANGKAP PESAN MASUK & MENGIRIM KE GOOGLE SHEET
 client.on('message', async msg => {
     try {
         let chat = await msg.getChat();
@@ -97,5 +127,5 @@ client.on('message', async msg => {
     }
 });
 
-// Mulai memuat browser chrome (proses paling berat)
+// Mulai memuat browser chrome 
 client.initialize();
