@@ -9,21 +9,33 @@ app.use(express.json());
 // ==========================================
 // PENGATURAN UTAMA
 // ==========================================
-// Masukkan URL Webhook Google Apps Script Anda di sini!
-const GAS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxUjD8FMi8mqbP6GqLi-vsmt7EjhOjXHZuV3Tws_LTmMbVxUcCBOZlVNkzYLiYrmjKzqw/exec';
-const PORT = process.env.PORT || 3000;
+// PASTIKAN GANTI DENGAN URL WEBHOOK CODE.GS ANDA!
+const GAS_WEBHOOK_URL = 'MASUKKAN_URL_GOOGLE_APPS_SCRIPT_ANDA_DISINI';
+const PORT = process.env.PORT || 10000; // Render menggunakan port 10000
 
-// Inisialisasi WhatsApp Client (Cocok untuk Shared Hosting/VPS)
+console.log('Memulai browser Chrome... Mohon tunggu 1-2 menit hingga QR Code muncul.');
+
+// Inisialisasi WhatsApp Client (Dioptimasi untuk RAM kecil / Render Free)
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-extensions'],
-        headless: true
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', // Jurus ampuh anti-hang di Render
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+        ]
     }
 });
 
 client.on('qr', (qr) => {
-    console.log('SCAN QR CODE INI DI WHATSAPP ANDA:');
+    console.log('=========================================');
+    console.log('✅ SCAN QR CODE INI DI WHATSAPP ANDA:');
+    console.log('=========================================');
     qrcode.generate(qr, { small: true });
 });
 
@@ -35,17 +47,16 @@ client.on('ready', () => {
 client.on('message', async msg => {
     try {
         let chat = await msg.getChat();
-
+        
         let payload = {
-            sender: chat.id._serialized, // Target balasan (Bisa nomor pribadi atau ID Grup)
-            message: msg.body, // Isi pesan (Misal: beli kopi 5k)
+            sender: chat.id._serialized, 
+            message: msg.body, 
             type: chat.isGroup ? "group" : "chat",
-            participant: chat.isGroup ? msg.author : msg.from // Menangkap Nomor Asli pengirim di Grup!
+            participant: chat.isGroup ? msg.author : msg.from 
         };
 
-        console.log(`Pesan masuk dari: ${payload.sender}, Teks: ${payload.message}`);
+        console.log(`[Pesan Masuk] Dari: ${payload.sender} | Teks: ${payload.message}`);
 
-        // Teruskan data ke Google Apps Script
         if (GAS_WEBHOOK_URL !== 'MASUKKAN_URL_GOOGLE_APPS_SCRIPT_ANDA_DISINI') {
             await axios.post(GAS_WEBHOOK_URL, payload);
         }
@@ -57,10 +68,7 @@ client.on('message', async msg => {
 
 client.initialize();
 
-// ==========================================
 // API ENDPOINT UNTUK MENERIMA BALASAN DARI GAS
-// ==========================================
-// Endpoint ini yang akan dipanggil oleh Google Sheet untuk membalas WA
 app.post('/send-message', async (req, res) => {
     try {
         const { target, text } = req.body;
@@ -69,10 +77,8 @@ app.post('/send-message', async (req, res) => {
             return res.status(400).json({ status: false, message: 'Target dan teks wajib diisi' });
         }
 
-        // Proses pengiriman pesan WA
         await client.sendMessage(target, text);
-
-        console.log(`Berhasil membalas ke: ${target}`);
+        console.log(`[Berhasil Membalas] Ke: ${target}`);
         res.json({ status: true, message: 'Pesan terkirim' });
 
     } catch (error) {
