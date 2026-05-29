@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json());
 
 // URL Webhook GAS (Sudah diisi dengan URL asli Anda)
-const GAS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxUjD8FMi8mqbP6GqLi-vsmt7EjhOjXHZuV3Tws_LTmMbVxUcCBOZlVNkzYLiYrmjKzqw/exec';
+const GAS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzbfVxXCaPyX9VNaxlGClERgVtC-HnPCqvq78u31ulvvqp4CJ9jitQ047br-8NnLoI/exec';
 const PORT = process.env.PORT || 10000; 
 
 let currentQR = ""; 
